@@ -1,71 +1,60 @@
-KEY_SIZE = 192              # Must be Divisible by 3
-BLOCK_SIZE = KEY_SIZE // 3 * 2
-ROUNDS = 12
+from random import choice, randint
+from calculator import aes_s_box
 
-# If u change subkey_order, u have to change decrypt function too !!!!
-SUBKEY_ORDER = [[0, 1, 2],  # LMR
-                [0, 2, 1],  # LRM
-                [1, 0, 2],  # MLR
-                [1, 2, 0],  # MRL
-                [2, 0, 1],  # RLM
-                [2, 1, 0],  # RML
-                ]
+BLOCK_SIZE = 256  # in bits, Must be dividble by 8
+KEY_SIZE = 128    # Must be half of BLOCK_SIZE
+ROUNDS = 16       # Must be Less than KEY_SIZE
 
 
-# Inverse of [0, 255] in GF(2^8) over 0x11B
-S_BOX = [0, 1, 141, 246, 203, 82, 123, 209, 232, 79, 41, 192, 176, 225, 229, 199, 116, 180, 170, 75, 153, 43, 96, 95, 88, 63, 253, 204, 255, 64, 238, 178, 58, 110, 90,
-         241, 85, 77, 168, 201, 193, 10, 152, 21, 48, 68, 162, 194, 44, 69, 146, 108, 243, 57, 102, 66, 242, 53, 32, 111, 119, 187, 89, 25, 29, 254, 55, 103, 45, 49, 245, 105, 167, 100, 171, 19, 84, 37, 233, 9, 237, 92, 5, 202, 76, 36, 135, 191, 24, 62, 34, 240, 81, 236, 97, 23, 22, 94, 175, 211, 73, 166, 54, 67, 244, 71, 145, 223, 51, 147, 33, 59, 121, 183, 151, 133, 16, 181, 186, 60, 182, 112, 208, 6, 161, 250, 129, 130, 131, 126, 127, 128, 150, 115, 190, 86, 155, 158, 149, 217, 247, 2, 185, 164, 222, 106, 50, 109, 216, 138, 132, 114, 42, 20, 159, 136, 249, 220, 137, 154, 251, 124, 46, 195, 143, 184, 101, 72, 38, 200, 18, 74, 206, 231, 210, 98, 12, 224, 31, 239, 17, 117, 120, 113, 165, 142, 118, 61, 189, 188, 134, 87, 11, 40, 47, 163, 218, 212, 228, 15, 169, 39, 83, 4, 27, 252, 172, 230, 122, 7, 174, 99, 197, 219, 226, 234, 148, 139, 196, 213, 157, 248, 144, 107, 177, 13, 214, 235, 198, 14, 207, 173, 8, 78, 215, 227, 93, 80, 30, 179, 91, 35, 56, 52, 104, 70, 3, 140, 221, 156, 125, 160, 205, 26, 65, 28]
+def load_constansts():
+    with open('constants.txt', 'r') as file:
+        all = file.read().split('\n')
+
+    key, iv = [''.join(i.split(',')) for i in all[:2]]
+    x = [int(j) for i in all[2:6] for j in i.split(',') if j != '']
+    ip = x[:BLOCK_SIZE]
+    ip_inv = x[BLOCK_SIZE:BLOCK_SIZE*2]
+    fp = x[BLOCK_SIZE*2:BLOCK_SIZE*2+BLOCK_SIZE//2]
+    kp = x[BLOCK_SIZE*2+BLOCK_SIZE//2:]
+    return key, iv, ip, ip_inv, fp, kp
 
 
-KEY_P1 = [20, 61, 35, 33, 9, 24, 10, 18, 51, 22, 49, 44, 40, 63, 12, 16, 38, 0, 8, 45, 21, 13, 48, 1, 27, 2, 34, 58, 5, 53, 50,
-          55, 25, 26, 54, 46, 4, 31, 30, 57, 37, 56, 15, 19, 32, 3, 23, 28, 29, 14, 39, 60, 6, 17, 52, 47, 7, 36, 43, 11, 42, 59, 41, 62]
-KEY_P2 = [14, 43, 24, 17, 46, 28, 56, 33, 38, 41, 25, 5, 10, 11, 61, 3, 39, 22, 15, 62, 40, 34, 31, 51, 12, 30, 9, 63, 49, 23,
-          19, 29, 21, 27, 45, 20, 50, 44, 0, 54, 36, 1, 7, 32, 52, 18, 60, 48, 57, 13, 42, 26, 8, 16, 53, 59, 37, 35, 47, 4, 2, 6, 58, 55]
-
-F_P1 = [31, 24, 6, 34, 40, 44, 21, 25, 63, 22, 3, 43, 51, 62, 53, 7, 17, 2, 41, 13, 27, 28, 29, 23, 26, 54, 58, 18, 19, 4, 61, 50, 59, 36, 14, 12, 49, 8, 20, 46, 9, 0,
-        32, 48, 16, 47, 55, 15, 5, 11, 52, 37, 45, 33, 10, 60, 39, 30, 1, 35, 56, 57, 42, 38]
+KEY, IV, IP, IP_INV, FP, KP = load_constansts()
 
 
-def bin64(x: int) -> str:
-    return bin(x)[2:].zfill(64)
+def rotate_right(binary_str, n):
+    # Ensure n is within the length of the binary string
+    n = n % len(binary_str)
+    return binary_str[-n:] + binary_str[:-n]
 
 
-def bin8(x: int) -> str:
-    return bin(x)[2:].zfill(8)
+def b2h(x: str, len=BLOCK_SIZE//4) -> str:
+    return hex(int(x, 2))[2:].zfill(len)
 
 
-def rotate_left(num, rotate_by, num_bits):
-    # Perform left rotation
-    return ((num << rotate_by) | (num >> (num_bits - rotate_by))) & ((1 << num_bits) - 1)
+def h2b(x: str, len=BLOCK_SIZE) -> str:
+    return bin(int(x, 16))[2:].zfill(len)
 
 
-def divide_key(key: int) -> list[str]:
-    key = bin(key)[2:].zfill(KEY_SIZE)
-    left = key[:KEY_SIZE//3]
-    middle = key[KEY_SIZE//3:KEY_SIZE//3*2]
-    right = key[KEY_SIZE//3*2:]
-    return left, middle, right
+def xor(x: str, y: str, is_hex=False) -> str:
+    if is_hex:
+        x, y = h2b(x), h2b(y)
+    ret = ''
+    for i in range(len(x)):
+        if x[i] == y[i]:
+            ret += '0'
+
+        else:
+            ret += '1'
+    return b2h(ret) if is_hex else ret
 
 
-def f_function(sub_key: int, x: int) -> int:
-    tmp = sub_key ^ x
-    tmps = []
-    for i in range(8):
-        tmp >> 8*i
-        tmps.append(tmp % 256)
+# Inputs 1 byte Binary and Outputs 1 byte Binary:
+def s_box(x: str) -> str:
+    if len(x) != 8:
+        raise ValueError("Input of S_Box must be 1 byte long")
 
-    for i in range(len(tmps)):
-        try:
-            tmps[i] = S_BOX[rotate_left(tmps[i], i, 8)]
-        except:
-            print(rotate_left(tmps[i], i, 8), tmps[i], i, 32<<3, 32>>5, 32<<3 | 32>>5)
-            exit(0)
-        
-    ret = 0
-    for i in range(8):
-        ret += tmps[i]*2**i
-
-    return int(permute(bin64(ret), F_P1), 2)
+    return bin(int(aes_s_box(int(x, 2)), 16))[2:].zfill(8)
 
 
 def permute(x: str, permutation: list) -> str:
@@ -75,105 +64,157 @@ def permute(x: str, permutation: list) -> str:
     return ret
 
 
-def sub_key_generator(key: int, round: int) -> int:
-    if not 1 <= round <= ROUNDS:
-        return None
+def sub_key_generator(key: str):
 
-    div_key = divide_key(key)
-    order = SUBKEY_ORDER[(round-1) % 6]
+    key = permute(key, KP)
 
-    left, mid, right = [int(div_key[i], 2) for i in order]
+    rot_num = KEY_SIZE//ROUNDS
+    subs, counter = [], '1'*rot_num
 
-    tmp = mid ^ right
-    tmp = permute(bin64(tmp), KEY_P1)
-    tmp = int(tmp, 2) ^ left
-    tmp = permute(bin64(tmp), KEY_P2)
+    for _ in range(ROUNDS):
+        key = rotate_right(key, rot_num)
+        subs.append(xor(key, counter.zfill(len(key))))
+        counter += '1'*rot_num
 
-    return int(tmp, 2)  # P2(P1(M xor R) xor L)
+    return subs
 
 
-def sub_keys_generator(key: int) -> list[int]:
-    return [sub_key_generator(key, i) for i in range(1, ROUNDS+1)]
+def f(r: str, sub_key: str):
+    rs = [r[i:i+8] for i in range(0, len(r), 8)]
+    subs = [sub_key[i:i+8] for i in range(0, len(sub_key), 8)]
+
+    fs = []
+    for i in range(len(rs)):
+        fs.append(s_box(xor(s_box(rs[i]), s_box(subs[i]))))
+
+    return permute(''.join(fs), FP)
 
 
-def encrypt(plain_text: str, key: int) -> str:
-
-    sub_keys = sub_keys_generator(key)
-    
-    while (len(plain_text) % 16 != 0):
-        plain_text += " "
-
-    blocks, bytes = [], []
-
-    for i in plain_text:
-        bytes.append(bin8(ord(i)))
-
-        if len(bytes) == 16:
-            blocks.append('')
-            for i in bytes:
-                blocks[-1] += i
-            bytes.clear()
-    
-    #print(blocks)
-    
-    
-    cipher_blocks = []
-    for block in blocks:
-        cipher_blocks.append(encrypt_block(block, sub_keys))
-
-    #print(cipher_blocks)
-
-    cipher_text = ''
-    for cblock in cipher_blocks:
-        for i in range(16):
-            byte = int(cblock[i*8:i*8+8], 2)    
-            cipher_text += chr(byte)
-
-    return cipher_text
+def feistel(l: str, r: str, key: str) -> str:
+    new_r = xor(l, f(r, key))
+    return r, new_r
 
 
-def encrypt_block(block: str, sub_keys: list[int]) -> int:
+def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> str:
 
-    
-    
-    left, right = block[:BLOCK_SIZE//2], block[BLOCK_SIZE//2:]
-    left, right = int(left, 2), int(right, 2)
+    # __Part1 --> Changit Plain_text form to Hex__
 
-    round = 1
-    while round <= ROUNDS:
-        
-        print(round)
-        print(bin64(right))
-        print(bin64(left))
-        print(bin64(sub_keys[round-1]), end='\n\n')
-        
-        next_left = f_function(sub_keys[round-1], right)
+    # If Input is Binary, Change it to Hex:
+    if inp_binary:
+        inp_len = len(plain_text)
+        hex_plain_text = hex(int(plain_text, 2))[2:].zfill(inp_len//4)
+    else:
+        # If We Are In Encypt Mode encode, English Message to Hex:
+        if not decrypt:
+            hex_plain_text = plain_text.encode().hex()
+        # If We Are Decrypting We Don't need to change Cipher to Hex because it already is Hex
+        else:
+            hex_plain_text = plain_text
 
-        right = next_left ^ left
-        left = next_left
+# __Part2 --> Split Message to Different Blocks__
+    blocks = [hex_plain_text[i:i+BLOCK_SIZE//4]
+              for i in range(0, len(hex_plain_text), BLOCK_SIZE//4)]
 
-        round += 1
+    # Ensure that last block hast the same size than others:
+    while len(blocks[-1]) < BLOCK_SIZE//4:
+        blocks[-1] += '0'
 
-    return bin64(right) + bin64(left)
+
+# __Part3 --> Generate SubKeys __
+
+    # If we are in Decrpyt mode we need to reverse sub_keys !!
+    sub_keys = sub_key_generator(KEY)
+    sub_keys = sub_keys[::-1] if decrypt else sub_keys
 
 
-def decrypt(cipher_text: str, key: int) -> int:
+# __Part4 --> Encrpyt Each Block
 
-    right, middle, left = divide_key(key)
+    if mode == 'normal':
+        cipher_text = [encrypt_block(i, sub_keys) for i in blocks]
+        cipher_text = ''.join(cipher_text)
 
-    reversed_key = int(right + middle + left, 2)
+    elif mode == 'CBC':
 
-    return encrypt(cipher_text, reversed_key)
+        if not decrypt:
+
+            cipher_text, last_encrypted_block = '', IV
+            for block in blocks:
+                last_encrypted_block = encrypt_block(
+                    xor(block, last_encrypted_block, True), sub_keys)
+                cipher_text += last_encrypted_block
+
+        else:
+
+            cipher_text = xor(encrypt_block(blocks[0], sub_keys), IV, True)
+            for i in range(1, len(blocks)):
+                cipher_text += xor(encrypt_block(blocks[i],
+                                   sub_keys), blocks[i-1], True)
+
+    return bytes.fromhex(cipher_text).decode() if decrypt else cipher_text
+
+
+def encrypt_block(inp: str, sub_keys: list[str]) -> str:
+
+    # Change to Binary:
+    inp = bin(int(inp, 16))[2:].zfill(len(inp)*4)
+    # Perform Initial Permutaion:
+    inp = permute(inp, IP)
+
+    # Continue to Feistel Network:
+    l, r = inp[:BLOCK_SIZE//2], inp[BLOCK_SIZE//2:]
+
+    for i in range(ROUNDS):
+        l, r = feistel(l, r, sub_keys[i])
+
+    # Swap l and r and Perform Final Permutaion:
+    out = permute(r+l, IP_INV)
+
+    return format(int(out, 2), f'0{BLOCK_SIZE//4}x')
+
+    # return hex(int(r, 2))[2:]+hex(int(l, 2))[2:]
+
+
+def diffusion_checker(plain_text_length: int = 256, mode='normal'):
+
+    pl = [choice(('0', '1')) for _ in range(plain_text_length)]
+    c1 = encrypt(''.join(pl), inp_binary=True, mode=mode)
+
+    pl2 = pl[::]
+    idx = randint(0, plain_text_length-1)
+    pl2[idx] = '0' if pl2[idx] == '1' else '1'
+
+    c2 = encrypt(''.join(pl2), inp_binary=True, mode=mode)
+    c1, c2 = bin(int(c1, 16)), bin(int(c2, 16))
+
+    pl_diff = 0
+    for i in range(len(pl)):
+        if pl[i] != pl2[i]:
+            pl_diff += 1
+
+    diff = 0
+    for i in range(len(c1)):
+        try:
+            if c1[i] != c2[i]:
+                diff += 1
+        except:
+            diff += 1
+
+    print(f"plain_text_length = {plain_text_length}")
+    print(f"bit at poisition {idx} changed in plain text")
+    print(f"{diff} bit(s) changed in cipher")
+    return diff
 
 
 if __name__ == "__main__":
-    key = 51278469120581351
-    plain = "OMID Re"
-    cipher = encrypt(plain, key)
-    print(cipher)
-    # for i in cipher:
-    #     print(ord(i), end=' ')
-    # print()
-    # dec = decrypt(cipher, key)
-    # for i in dec:
-    #     print(ord(i), end=' ')
+    mode = 'CBC'
+
+    plain_text = "Nuclear Weapons will be launched at 5:32 AM October 7, 2024 "
+    cipher_text = encrypt(plain_text, mode=mode)
+    decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
+
+    print(f"Plain Text        :\t{plain_text}")
+
+    print(f"Key               :\t0x{b2h(KEY, KEY_SIZE//8).upper()}")
+    print(f"IV                :\t0x{IV.upper()}\n")
+    print(f"Cipher Text       :\t{cipher_text}\n")
+    print(f"Decrypted         :\t{decrypted_text}")

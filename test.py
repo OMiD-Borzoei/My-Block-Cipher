@@ -1,9 +1,9 @@
-from random import shuffle, choice, randint
+from random import choice, randint
 from calculator import aes_s_box
 
-KEY_SIZE = 128
 BLOCK_SIZE = 256  # in bits, Must be dividble by 8
-ROUNDS = 12      # Must be Less than KEY_SIZE
+KEY_SIZE = 128    # Must be half of BLOCK_SIZE
+ROUNDS = 16       # Must be Less than KEY_SIZE
 
 
 def load_constansts():
@@ -11,14 +11,21 @@ def load_constansts():
         all = file.read().split('\n')
 
     key, iv = [''.join(i.split(',')) for i in all[:2]]
-    x = [int(j) for i in all[2:5] for j in i.split(',') if j != '']
+    x = [int(j) for i in all[2:6] for j in i.split(',') if j != '']
     ip = x[:BLOCK_SIZE]
     ip_inv = x[BLOCK_SIZE:BLOCK_SIZE*2]
-    fp = x[BLOCK_SIZE*2:]
-    return key, iv, ip, ip_inv, fp
+    fp = x[BLOCK_SIZE*2:BLOCK_SIZE*2+BLOCK_SIZE//2]
+    kp = x[BLOCK_SIZE*2+BLOCK_SIZE//2:]
+    return key, iv, ip, ip_inv, fp, kp
 
 
-KEY, IV, IP, IP_INV, FP = load_constansts()
+KEY, IV, IP, IP_INV, FP, KP = load_constansts()
+
+
+def rotate_right(binary_str, n):
+    # Ensure n is within the length of the binary string
+    n = n % len(binary_str)
+    return binary_str[-n:] + binary_str[:-n]
 
 
 def b2h(x: str, len=BLOCK_SIZE//4) -> str:
@@ -58,11 +65,16 @@ def permute(x: str, permutation: list) -> str:
 
 
 def sub_key_generator(key: str):
-    subs, counter = [], '1'
+
+    key = permute(key, KP)
+
+    rot_num = KEY_SIZE//ROUNDS
+    subs, counter = [], '1'*rot_num
 
     for _ in range(ROUNDS):
+        key = rotate_right(key, rot_num)
         subs.append(xor(key, counter.zfill(len(key))))
-        counter += '1'
+        counter += '1'*rot_num
 
     return subs
 
@@ -172,7 +184,6 @@ def diffusion_checker(plain_text_length: int = 256, mode='normal'):
     pl2[idx] = '0' if pl2[idx] == '1' else '1'
 
     c2 = encrypt(''.join(pl2), inp_binary=True, mode=mode)
-
     c1, c2 = bin(int(c1, 16)), bin(int(c2, 16))
 
     pl_diff = 0
@@ -188,24 +199,22 @@ def diffusion_checker(plain_text_length: int = 256, mode='normal'):
         except:
             diff += 1
 
+    print(f"plain_text_length = {plain_text_length}")
     print(f"bit at poisition {idx} changed in plain text")
     print(f"{diff} bit(s) changed in cipher")
-    
+    return diff
 
 
 if __name__ == "__main__":
-
     mode = 'CBC'
 
     plain_text = "Nuclear Weapons will be launched at 5:32 AM October 7, 2024 "
-    
     cipher_text = encrypt(plain_text, mode=mode)
     decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
-    
-    
+
     print(f"Plain Text        :\t{plain_text}")
-    # print(f"Encoded Plain Text:\t{plain_text.encode().hex()}\n")
+
     print(f"Key               :\t0x{b2h(KEY, KEY_SIZE//8).upper()}")
-    print(f"IV:                \t0x{IV.upper()}\n")
+    print(f"IV                :\t0x{IV.upper()}\n")
     print(f"Cipher Text       :\t{cipher_text}\n")
     print(f"Decrypted         :\t{decrypted_text}")
