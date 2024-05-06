@@ -1,34 +1,40 @@
 from random import shuffle, choice, randint
 from calculator import aes_s_box
 
-KEY = '11010001'
-KEY_SIZE = 8
-BLOCK_SIZE = 16  # in bits
-ROUNDS = 12
+KEY_SIZE = 32
+BLOCK_SIZE = 64  # in bits, Must be dividble by 8
+ROUNDS = 12      # Must be Less than KEY_SIZE
 
 
+KEY = '00001111100000101110111100110110'
+IP = [29, 15, 59, 1, 37, 14, 25, 35, 24, 16, 58, 19, 18, 36, 49, 55, 45, 48, 12, 4, 52, 60, 38, 41, 5, 28, 32, 8, 57, 53, 62, 22, 6, 63, 51, 23, 43, 56, 7, 11, 2, 13, 0, 20, 40, 31, 27, 30, 39,
+      9, 46, 21, 50, 61, 26, 10, 44, 17, 42, 34, 54, 3, 47, 33]
+IP_INV = [42, 3, 40, 61, 19, 24, 32, 38, 27, 49, 55, 39, 18, 41, 5, 1, 9, 57, 12, 11, 43, 51, 31, 35, 8, 6, 54, 46, 25, 0, 47, 45, 26, 63, 59, 7, 13, 4, 22, 48, 44, 23, 58, 36, 56, 16, 50, 62,
+          17, 14, 52, 34, 20, 29, 60, 15, 37, 28, 10, 2, 21, 53, 30, 33]
+IV = '96f31e9bbe713431'
+FP = [8, 12, 14, 5, 0, 25, 20, 27, 9, 6, 10, 3, 21, 17, 28, 22,
+      29, 4, 1, 16, 26, 11, 2, 7, 24, 19, 31, 23, 13, 30, 18, 15]
 
 
-IP = [0, 12, 14, 13, 7, 5, 6, 11, 9, 4, 10, 1, 3, 2, 15, 8]
-IP_INV = [0, 11, 13, 12, 9, 5, 6, 4, 15, 8, 10, 7, 1, 3, 2, 14]
-IV = "486e"
+def b2h(x: str, len=BLOCK_SIZE//4) -> str:
+    return hex(int(x, 2))[2:].zfill(len)
 
 
-def xor(x: str, y: str) -> str:
+def h2b(x: str, len=BLOCK_SIZE) -> str:
+    return bin(int(x, 16))[2:].zfill(len)
+
+
+def xor(x: str, y: str, is_hex=False) -> str:
+    if is_hex:
+        x, y = h2b(x), h2b(y)
     ret = ''
     for i in range(len(x)):
         if x[i] == y[i]:
             ret += '0'
+
         else:
             ret += '1'
-    return ret
-
-
-def b2h(x: str, len = BLOCK_SIZE//4) -> str:
-    return hex(int(x, 2))[2:].zfill(len)
-
-def h2b(x: str, len=BLOCK_SIZE) -> str:
-    return bin(int(x, 16))[2:].zfill(len)
+    return b2h(ret) if is_hex else ret
 
 
 # Inputs 1 byte Binary and Outputs 1 byte Binary:
@@ -48,22 +54,33 @@ def permute(x: str, permutation: list) -> str:
 
 def sub_key_generator(key: str):
     subs = []
-    for i in range(ROUNDS):
-        subs.append(xor(key, bin(i)[2:].zfill(len(key))))
+    counter = '1'
+    for _ in range(ROUNDS):
+        subs.append(xor(key, counter.zfill(len(key))))
+        counter += '1'
+
     return subs
 
 
 def f(r: str, sub_key: str):
-    return s_box(xor(s_box(r), s_box(sub_key)))
+
+    rs = [r[i:i+8] for i in range(0, len(r), 8)]
+    subs = [sub_key[i:i+8] for i in range(0, len(sub_key), 8)]
+    # print(rs, subs)
+    fs = []
+    for i in range(len(rs)):
+        fs.append(s_box(xor(s_box(rs[i]), s_box(subs[i]))))
+
+    return permute(''.join(fs), FP)
 
 
 def feistel(l: str, r: str, key: str) -> str:
-    new_r = xor(l, f(key, r))
+    new_r = xor(l, f(r, key))
     return r, new_r
 
 
 def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> str:
-    global IV
+
     # __Part1 --> Changit Plain_text form to Hex__
 
     # If Input is Binary, Change it to Hex:
@@ -79,11 +96,8 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
             hex_plain_text = plain_text
 
 # __Part2 --> Split Message to Different Blocks__
-
-    parts = len(hex_plain_text)*4 // BLOCK_SIZE
-    part_size = len(hex_plain_text)//parts
-    blocks = [hex_plain_text[i:i+part_size]
-              for i in range(0, len(hex_plain_text), part_size)]
+    blocks = [hex_plain_text[i:i+BLOCK_SIZE//4]
+              for i in range(0, len(hex_plain_text), BLOCK_SIZE//4)]
 
     # Ensure that last block hast the same size than others:
     while len(blocks[-1]) < BLOCK_SIZE//4:
@@ -106,38 +120,19 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
     elif mode == 'CBC':
 
         if not decrypt:
+
             cipher_text, last_encrypted_block = '', IV
-
             for block in blocks:
-
-                block = bin(int(block, 16))[2:].zfill(BLOCK_SIZE)
-                last_encrypted_block = bin(int(last_encrypted_block, 16))[
-                    2:].zfill(BLOCK_SIZE)
-                xorr = hex(int(xor(block, last_encrypted_block), 2))[
-                    2:].zfill(BLOCK_SIZE//4)
-
-                last_encrypted_block = encrypt_block(xorr, sub_keys)
+                last_encrypted_block = encrypt_block(
+                    xor(block, last_encrypted_block, True), sub_keys)
                 cipher_text += last_encrypted_block
 
         else:
-            bin_IV = bin(int(IV, 16))[2:].zfill(BLOCK_SIZE)
 
-            first_decrypted_block = encrypt_block(blocks[0], sub_keys)
-
-            first_decrypted_block = bin(int(first_decrypted_block, 16))[
-                2:].zfill(BLOCK_SIZE)
-
-            cipher_text = hex(int(xor(first_decrypted_block, bin_IV), 2))[
-                2:].zfill(BLOCK_SIZE//4)
-
+            cipher_text = xor(encrypt_block(blocks[0], sub_keys), IV, True)
             for i in range(1, len(blocks)):
-                decrypted = encrypt_block(blocks[i], sub_keys)
-                decrypted = bin(int(decrypted, 16))[2:].zfill(BLOCK_SIZE)
-
-                prev = bin(int(blocks[i-1], 16))[2:].zfill(BLOCK_SIZE)
-
-                cipher_text += hex(int(xor(decrypted, prev), 2)
-                                   )[2:].zfill(BLOCK_SIZE//4)
+                cipher_text += xor(encrypt_block(blocks[i],
+                                   sub_keys), blocks[i-1], True)
 
     return bytes.fromhex(cipher_text).decode() if decrypt else cipher_text
 
@@ -183,23 +178,23 @@ def diffusion_checker(plain_text_length: int = 256, mode='normal'):
 
     diff = 0
     for i in range(len(c1)):
-        if c1[i] != c2[i]:
+        try:
+            if c1[i] != c2[i]:
+                diff += 1
+        except:
             diff += 1
 
-    print(f"{pl_diff} bit(s) changed in plain text")
+    print(f"bit at poisition {idx} changed in plain text")
     print(f"{diff} bit(s) changed in cipher")
 
 
 if __name__ == "__main__":
-    # b = '10011010'
-    # print(IP)
-    # print(permute(b, IP))
-    # print(IP_INV)
-    # print(permute(permute(b, IP), IP_INV))
 
-    print("Avalanche Effect: ")
-    diffusion_checker(mode='CBC')
-    print("\n\n")
+    mode = 'CBC'
+
+    print("\t\tAvalanche Effect: ")
+    diffusion_checker(mode=mode)
+    print("\n")
 
     plain_text = "Nuclear Weapons will be launched at 5:32 AM October 7, 2024 "
     print(f"Plain Text        :\t{plain_text}")
@@ -207,10 +202,8 @@ if __name__ == "__main__":
     print(f"Encoded Plain Text:\t{plain_text.encode().hex()}\n")
 
     print(f"Key = {hex(int(KEY, 2))}")
-    cipher_text = encrypt(plain_text, mode='CBC')
+    cipher_text = encrypt(plain_text, mode=mode)
     print(f"Cipher Text       :\t{cipher_text}\n")
 
-    decrypted_text = encrypt(cipher_text, decrypt=True, mode='CBC')
+    decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
     print(f"Decrypted         :\t{decrypted_text}")
-
-    # print(format(int("00000110", 2), '02x'))
