@@ -53,8 +53,8 @@ def permute(x: str, permutation: list) -> str:
 
 
 def sub_key_generator(key: str):
-    subs = []
-    counter = '1'
+    subs, counter = [], '1'
+    
     for _ in range(ROUNDS):
         subs.append(xor(key, counter.zfill(len(key))))
         counter += '1'
@@ -63,10 +63,9 @@ def sub_key_generator(key: str):
 
 
 def f(r: str, sub_key: str):
-
     rs = [r[i:i+8] for i in range(0, len(r), 8)]
     subs = [sub_key[i:i+8] for i in range(0, len(sub_key), 8)]
-    # print(rs, subs)
+
     fs = []
     for i in range(len(rs)):
         fs.append(s_box(xor(s_box(rs[i]), s_box(subs[i]))))
