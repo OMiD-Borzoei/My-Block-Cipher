@@ -1,19 +1,24 @@
 from random import shuffle, choice, randint
 from calculator import aes_s_box
 
-KEY_SIZE = 32
-BLOCK_SIZE = 64  # in bits, Must be dividble by 8
+KEY_SIZE = 128
+BLOCK_SIZE = 256  # in bits, Must be dividble by 8
 ROUNDS = 12      # Must be Less than KEY_SIZE
 
 
-KEY = '00001111100000101110111100110110'
-IP = [29, 15, 59, 1, 37, 14, 25, 35, 24, 16, 58, 19, 18, 36, 49, 55, 45, 48, 12, 4, 52, 60, 38, 41, 5, 28, 32, 8, 57, 53, 62, 22, 6, 63, 51, 23, 43, 56, 7, 11, 2, 13, 0, 20, 40, 31, 27, 30, 39,
-      9, 46, 21, 50, 61, 26, 10, 44, 17, 42, 34, 54, 3, 47, 33]
-IP_INV = [42, 3, 40, 61, 19, 24, 32, 38, 27, 49, 55, 39, 18, 41, 5, 1, 9, 57, 12, 11, 43, 51, 31, 35, 8, 6, 54, 46, 25, 0, 47, 45, 26, 63, 59, 7, 13, 4, 22, 48, 44, 23, 58, 36, 56, 16, 50, 62,
-          17, 14, 52, 34, 20, 29, 60, 15, 37, 28, 10, 2, 21, 53, 30, 33]
-IV = '96f31e9bbe713431'
-FP = [8, 12, 14, 5, 0, 25, 20, 27, 9, 6, 10, 3, 21, 17, 28, 22,
-      29, 4, 1, 16, 26, 11, 2, 7, 24, 19, 31, 23, 13, 30, 18, 15]
+def load_constansts():
+    with open('constants.txt', 'r') as file:
+        all = file.read().split('\n')
+
+    key, iv = [''.join(i.split(',')) for i in all[:2]]
+    x = [int(j) for i in all[2:5] for j in i.split(',') if j != '']
+    ip = x[:BLOCK_SIZE]
+    ip_inv = x[BLOCK_SIZE:BLOCK_SIZE*2]
+    fp = x[BLOCK_SIZE*2:]
+    return key, iv, ip, ip_inv, fp
+
+
+KEY, IV, IP, IP_INV, FP = load_constansts()
 
 
 def b2h(x: str, len=BLOCK_SIZE//4) -> str:
@@ -54,7 +59,7 @@ def permute(x: str, permutation: list) -> str:
 
 def sub_key_generator(key: str):
     subs, counter = [], '1'
-    
+
     for _ in range(ROUNDS):
         subs.append(xor(key, counter.zfill(len(key))))
         counter += '1'
@@ -185,24 +190,22 @@ def diffusion_checker(plain_text_length: int = 256, mode='normal'):
 
     print(f"bit at poisition {idx} changed in plain text")
     print(f"{diff} bit(s) changed in cipher")
+    
 
 
 if __name__ == "__main__":
 
     mode = 'CBC'
 
-    print("\t\tAvalanche Effect: ")
-    diffusion_checker(mode=mode)
-    print("\n")
-
     plain_text = "Nuclear Weapons will be launched at 5:32 AM October 7, 2024 "
-    print(f"Plain Text        :\t{plain_text}")
-
-    print(f"Encoded Plain Text:\t{plain_text.encode().hex()}\n")
-
-    print(f"Key = {hex(int(KEY, 2))}")
+    
     cipher_text = encrypt(plain_text, mode=mode)
-    print(f"Cipher Text       :\t{cipher_text}\n")
-
     decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
+    
+    
+    print(f"Plain Text        :\t{plain_text}")
+    # print(f"Encoded Plain Text:\t{plain_text.encode().hex()}\n")
+    print(f"Key               :\t0x{b2h(KEY, KEY_SIZE//8).upper()}")
+    print(f"IV:                \t0x{IV.upper()}\n")
+    print(f"Cipher Text       :\t{cipher_text}\n")
     print(f"Decrypted         :\t{decrypted_text}")

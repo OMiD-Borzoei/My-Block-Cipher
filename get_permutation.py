@@ -1,7 +1,6 @@
 from random import shuffle, choice 
 from test import BLOCK_SIZE, KEY_SIZE
 
-
 KEY = [choice(('0', '1')) for _ in range(KEY_SIZE)]
 KEY = ''.join(KEY)
 
@@ -19,13 +18,15 @@ IP_INV = [0]*BLOCK_SIZE
 for i in range(BLOCK_SIZE):
     IP_INV[IP[i]] = i
 
+
+with open('constants.txt', 'w') as file:
+    for i in [KEY, IV, IP, IP_INV, FP]:
+        for j in i:
+            file.write(str(j) + ',')
+        file.write('\n')
+        
+ 
 print(f"KEY = '{KEY}'\nIP = {IP}\nIP_INV  = {IP_INV}\nIV = '{IV}'\nFP = {FP}")
 
 
 
-# KEY_P1 = list(range(64))
-# KEY_P2 = list(range(64))
-# shuffle(KEY_P1)
-# shuffle(KEY_P2)
-# print(KEY_P1)
-# print(KEY_P2)
