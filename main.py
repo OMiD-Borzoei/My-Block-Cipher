@@ -99,7 +99,7 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
 
     if mode not in ['normal', 'CBC']:
         raise ValueError(f'Valid Values for mode are: ["normal", "CBC"]')
-    
+
     # __Part1 --> Changit Plain_text form to Hex__
 
     # If Input is Binary, Change it to Hex:
@@ -176,7 +176,7 @@ def encrypt_block(inp: str, sub_keys: list[str]) -> str:
 
 
 if __name__ == "__main__":
-    mode = 'CBC' # Either a Choice between CBC and normal
+    mode = 'CBC'  # Either a Choice between CBC and normal
 
     plain_text = "6 Nuclear Missiles will be launched at 5:32 AM October 7, 2024 "
     plain_text = "I ♡ Cyper Security"

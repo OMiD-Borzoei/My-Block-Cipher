@@ -1,5 +1,5 @@
 from random import shuffle, choice 
-from test import BLOCK_SIZE, KEY_SIZE
+from main import BLOCK_SIZE, KEY_SIZE
 
 KEY = [choice(('0', '1')) for _ in range(KEY_SIZE)]
 KEY = ''.join(KEY)
