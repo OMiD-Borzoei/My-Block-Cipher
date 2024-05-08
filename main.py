@@ -1,10 +1,17 @@
 from calculator import aes_s_box
 
+# You Can set below Parameters to anything u want, but u must follow some rules
+
+# For faster encryption -> lower the number of rounds, but keep in mind, low number of rounds
+# means worse diffusion.
+
+# For better Security, Increase key size and block size, but keep in mind it slows down the process.
+
 BLOCK_SIZE = 256  # in bits, Must be dividble by 8
 KEY_SIZE = 128    # Must be half of BLOCK_SIZE
 ROUNDS = 16       # Must be Less than KEY_SIZE
 
-
+# Do not Change this method
 def load_constansts():
     with open('constants.txt', 'r') as file:
         all = file.read().split('\n')
@@ -21,6 +28,7 @@ def load_constansts():
 KEY, IV, IP, IP_INV, FP, KP = load_constansts()
 
 
+# ---- Here are some methods which we'll use a lot further down the road -----
 def rotate_right(binary_str, n):
     # Ensure n is within the length of the binary string
     n = n % len(binary_str)
@@ -176,7 +184,7 @@ def encrypt_block(inp: str, sub_keys: list[str]) -> str:
 
 
 if __name__ == "__main__":
-    mode = 'CBC'  # Either a Choice between CBC and normal
+    mode = 'CBC'  #A Choice between CBC and normal
 
     plain_text = "6 Nuclear Missiles will be launched at 5:32 AM October 7, 2024 "
     plain_text = "I ♡ Cyper Security"
