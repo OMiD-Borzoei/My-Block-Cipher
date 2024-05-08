@@ -1,4 +1,3 @@
-from random import choice, randint
 from calculator import aes_s_box
 
 BLOCK_SIZE = 256  # in bits, Must be dividble by 8
@@ -65,7 +64,7 @@ def permute(x: str, permutation: list) -> str:
 
 
 def sub_key_generator(key: str):
-
+    # Permute Key:
     key = permute(key, KP)
 
     rot_num = KEY_SIZE//ROUNDS
@@ -80,6 +79,7 @@ def sub_key_generator(key: str):
 
 
 def f(r: str, sub_key: str):
+    # Split inputs into n different bytes:
     rs = [r[i:i+8] for i in range(0, len(r), 8)]
     subs = [sub_key[i:i+8] for i in range(0, len(sub_key), 8)]
 
@@ -97,6 +97,9 @@ def feistel(l: str, r: str, key: str) -> str:
 
 def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> str:
 
+    if mode not in ['normal', 'CBC']:
+        raise ValueError(f'Valid Values for mode are: ["normal", "CBC"]')
+    
     # __Part1 --> Changit Plain_text form to Hex__
 
     # If Input is Binary, Change it to Hex:
@@ -156,7 +159,7 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
 def encrypt_block(inp: str, sub_keys: list[str]) -> str:
 
     # Change to Binary:
-    inp = bin(int(inp, 16))[2:].zfill(len(inp)*4)
+    inp = h2b(inp)
     # Perform Initial Permutaion:
     inp = permute(inp, IP)
 
@@ -171,50 +174,23 @@ def encrypt_block(inp: str, sub_keys: list[str]) -> str:
 
     return format(int(out, 2), f'0{BLOCK_SIZE//4}x')
 
-    # return hex(int(r, 2))[2:]+hex(int(l, 2))[2:]
-
-
-def diffusion_checker(plain_text_length: int = 256, mode='normal'):
-
-    pl = [choice(('0', '1')) for _ in range(plain_text_length)]
-    c1 = encrypt(''.join(pl), inp_binary=True, mode=mode)
-
-    pl2 = pl[::]
-    idx = randint(0, plain_text_length-1)
-    pl2[idx] = '0' if pl2[idx] == '1' else '1'
-
-    c2 = encrypt(''.join(pl2), inp_binary=True, mode=mode)
-    c1, c2 = bin(int(c1, 16)), bin(int(c2, 16))
-
-    pl_diff = 0
-    for i in range(len(pl)):
-        if pl[i] != pl2[i]:
-            pl_diff += 1
-
-    diff = 0
-    for i in range(len(c1)):
-        try:
-            if c1[i] != c2[i]:
-                diff += 1
-        except:
-            diff += 1
-
-    print(f"plain_text_length = {plain_text_length}")
-    print(f"bit at poisition {idx} changed in plain text")
-    print(f"{diff} bit(s) changed in cipher")
-    return diff
-
 
 if __name__ == "__main__":
-    mode = 'CBC'
+    mode = 'CBC' # Either a Choice between CBC and normal
 
-    plain_text = "Nuclear Weapons will be launched at 5:32 AM October 7, 2024 "
+    plain_text = "6 Nuclear Missiles will be launched at 5:32 AM October 7, 2024 "
+    plain_text = "I ♡ Cyper Security"
+    plain_text = "This is the Plain Text"
+    plain_text = "Coded By Omid Reza Borzoei 99243020"
+    plain_text = "You Can See a Variety of Characters In this Message: @#$%^&*()!~+:?><[]\|"
     cipher_text = encrypt(plain_text, mode=mode)
     decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
 
     print(f"Plain Text        :\t{plain_text}")
 
     print(f"Key               :\t0x{b2h(KEY, KEY_SIZE//8).upper()}")
-    print(f"IV                :\t0x{IV.upper()}\n")
+    print(f"Mode              :\t{mode}\n")
+    if mode != 'normal':
+        print(f"IV                :\t0x{IV.upper()}\n")
     print(f"Cipher Text       :\t{cipher_text}\n")
     print(f"Decrypted         :\t{decrypted_text}")
