@@ -1,4 +1,4 @@
-from calculator import aes_s_box
+from numpy import genfromtxt
 
 # You Can set below Parameters to anything u want, but u must follow some rules
 
@@ -11,21 +11,15 @@ BLOCK_SIZE = 256  # in bits, Must be dividble by 8
 KEY_SIZE = 128    # Must be half of BLOCK_SIZE
 ROUNDS = 16       # Must be Less than KEY_SIZE
 
-# Do not Change this method
-def load_constansts():
-    with open('constants.txt', 'r') as file:
-        all = file.read().split('\n')
+AES_S_BOX = genfromtxt('aes_s_box.txt', dtype='str')
 
-    key, iv = [''.join(i.split(',')) for i in all[:2]]
-    x = [int(j) for i in all[2:6] for j in i.split(',') if j != '']
-    ip = x[:BLOCK_SIZE]
-    ip_inv = x[BLOCK_SIZE:BLOCK_SIZE*2]
-    fp = x[BLOCK_SIZE*2:BLOCK_SIZE*2+BLOCK_SIZE//2]
-    kp = x[BLOCK_SIZE*2+BLOCK_SIZE//2:]
-    return key, iv, ip, ip_inv, fp, kp
+IP = genfromtxt('IP.txt', dtype='int')
+KP = genfromtxt('KP.txt', dtype='int')
+FP = genfromtxt('FP.txt', dtype='int')
+IP_INV = genfromtxt('IP_INV.txt', dtype='int')
 
-
-KEY, IV, IP, IP_INV, FP, KP = load_constansts()
+KEY = ''.join(genfromtxt('KEY.txt', dtype='str').tolist())
+IV = ''.join(genfromtxt('IV.txt', dtype='str').tolist())
 
 
 # ---- Here are some methods which we'll use a lot further down the road -----
@@ -61,7 +55,8 @@ def s_box(x: str) -> str:
     if len(x) != 8:
         raise ValueError("Input of S_Box must be 1 byte long")
 
-    return bin(int(aes_s_box(int(x, 2)), 16))[2:].zfill(8)
+    row, col = int(x[:4], 2), int(x[4:], 2)
+    return h2b(AES_S_BOX[row][col], 8)
 
 
 def permute(x: str, permutation: list) -> str:
@@ -71,7 +66,10 @@ def permute(x: str, permutation: list) -> str:
     return ret
 
 
-def sub_key_generator(key: str):
+def sub_key_generator(key: str) -> list[str]:
+    if len(key) < len(KP):
+        key = h2b(key, KEY_SIZE*4)
+
     # Permute Key:
     key = permute(key, KP)
 
@@ -184,21 +182,38 @@ def encrypt_block(inp: str, sub_keys: list[str]) -> str:
 
 
 if __name__ == "__main__":
-    mode = 'CBC'  #A Choice between CBC and normal
+    mode = 'CBC'  # A Choice between CBC and normal
 
     plain_text = "6 Nuclear Missiles will be launched at 5:32 AM October 7, 2024 "
-    plain_text = "I ♡ Cyper Security"
-    plain_text = "This is the Plain Text"
-    plain_text = "Coded By Omid Reza Borzoei 99243020"
-    plain_text = "You Can See a Variety of Characters In this Message: @#$%^&*()!~+:?><[]\|"
+    # plain_text = "I ♡ Cyper Security"
+    # plain_text = "This is the Plain Text"
+    # plain_text = "Coded By Omid Reza Borzoei 99243020"
+    # plain_text = "You Can See a Variety of Characters In this Message: @#$%^&*()!~+:?><[]\|"
     cipher_text = encrypt(plain_text, mode=mode)
     decrypted_text = encrypt(cipher_text, decrypt=True, mode=mode)
 
     print(f"Plain Text        :\t{plain_text}")
 
-    print(f"Key               :\t0x{b2h(KEY, KEY_SIZE//8).upper()}")
+    print(f"Key               :\t0x{KEY.upper()}")
     print(f"Mode              :\t{mode}\n")
     if mode != 'normal':
         print(f"IV                :\t0x{IV.upper()}\n")
     print(f"Cipher Text       :\t{cipher_text}\n")
     print(f"Decrypted         :\t{decrypted_text}")
+
+    # AES_S_BOX = np.array(AES_S_BOX)
+    # np.savetxt('aes_s_box.txt', AES_S_BOX, fmt='%s')
+    # x = np.genfromtxt('aes_s_box.txt', dtype='str')
+    # print(x)
+    # for i in range(16):
+    #     i = bin(i)[2:]
+    #     print("[", end='')
+    #     for j in range(16):
+    #         j = bin(j)[2:]
+    #         x = aes_s_box(int(i+j, 2))
+    #         print(f"'{x[2:].zfill(2)}'", end=',' if j != "1111" else "")
+    #     print("],")
+
+    # num = "56"
+    # print(b2h(s_box(h2b(num, 8)), 2))
+    # print(aes_s_box(int(num, 16))[2:])
