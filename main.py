@@ -1,14 +1,15 @@
 from numpy import genfromtxt
 
-# You Can set below Parameters to anything u want, but u must follow some rules
+# You Can set these Parameters to anything u want, but u must follow some rules
 
-# For faster encryption -> lower the number of rounds, but keep in mind, low number of rounds
-# means worse diffusion.
+# For faster encryption -> lower the number of rounds, but keep in mind, the less rounds u have
+# the less secure ur encryption is.
 
-# For better Security, Increase key size and block size, but keep in mind it slows down the process.
+# For better Security, Increase key size and block size, however, keep in mind it slows down the process.
 
-BLOCK_SIZE = 256  # in bits, Must be dividble by 8
+BLOCK_SIZE = 256  # in bits, Must be dividable by 8
 KEY_SIZE = 128    # Must be half of BLOCK_SIZE
+# If u change any one of the constants above, u must run get_permutation.py once before running this script
 ROUNDS = 16       # Must be Less than KEY_SIZE
 
 AES_S_BOX = genfromtxt('aes_s_box.txt', dtype='str')
@@ -101,12 +102,13 @@ def feistel(l: str, r: str, key: str) -> str:
     return r, new_r
 
 
-def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> str:
+def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='ECB', parallel = False) -> str:
 
-    if mode not in ['normal', 'CBC']:
-        raise ValueError(f'Valid Values for mode are: ["normal", "CBC"]')
+    supported_modes = ['CBC', 'OFB', 'CTR', 'ECB']
+    if mode not in supported_modes:
+        raise ValueError(f'Valid Values for mode are: {supported_modes}')
 
-    # __Part1 --> Changit Plain_text form to Hex__
+    # __Part1 --> Change Plain_text form to Hex__
 
     # If Input is Binary, Change it to Hex:
     if inp_binary:
@@ -138,12 +140,17 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
 
 # __Part4 --> Encrpyt Each Block
 
-    if mode == 'normal':
-        cipher_text = [encrypt_block(i, sub_keys) for i in blocks]
-        cipher_text = ''.join(cipher_text)
+    if mode == 'ECB':
+        if not parallel:
+            cipher_text = [encrypt_block(i, sub_keys) for i in blocks]
+            cipher_text = ''.join(cipher_text)
+        
+        if parallel:
+            pass 
 
     elif mode == 'CBC':
 
+        # Encrypting in CBC mode:
         if not decrypt:
 
             cipher_text, last_encrypted_block = '', IV
@@ -152,12 +159,27 @@ def encrypt(plain_text: str, decrypt=False, inp_binary=False, mode='normal') -> 
                     xor(block, last_encrypted_block, True), sub_keys)
                 cipher_text += last_encrypted_block
 
+        # Decrypting in CBC mode:
         else:
 
-            cipher_text = xor(encrypt_block(blocks[0], sub_keys), IV, True)
-            for i in range(1, len(blocks)):
-                cipher_text += xor(encrypt_block(blocks[i],
-                                   sub_keys), blocks[i-1], True)
+            # Sequential Decyrpting:
+            if not parallel:
+                cipher_text = xor(encrypt_block(blocks[0], sub_keys), IV, True)
+                for i in range(1, len(blocks)):
+                    cipher_text += xor(encrypt_block(blocks[i],
+                                    sub_keys), blocks[i-1], True)
+            # Parallel Decrypting:
+            else:
+                """Your Job"""
+                pass 
+            
+    elif mode == 'CTR':
+        """Your Job"""
+        pass 
+    
+    elif mode == 'OFB':
+        """Your Job"""
+        pass 
 
     return bytes.fromhex(cipher_text).decode() if decrypt else cipher_text
 
@@ -170,19 +192,19 @@ def encrypt_block(inp: str, sub_keys: list[str]) -> str:
     inp = permute(inp, IP)
 
     # Continue to Feistel Network:
-    l, r = inp[:BLOCK_SIZE//2], inp[BLOCK_SIZE//2:]
+    left, right = inp[:BLOCK_SIZE//2], inp[BLOCK_SIZE//2:]
 
     for i in range(ROUNDS):
-        l, r = feistel(l, r, sub_keys[i])
+        left, right = feistel(left, right, sub_keys[i])
 
     # Swap l and r and Perform Final Permutaion:
-    out = permute(r+l, IP_INV)
+    out = permute(right+left, IP_INV)
 
     return format(int(out, 2), f'0{BLOCK_SIZE//4}x')
 
 
 if __name__ == "__main__":
-    mode = 'CBC'  # A Choice between CBC and normal
+    mode = 'ECB'  
 
     plain_text = "6 Nuclear Missiles will be launched at 5:32 AM October 7, 2024 "
     # plain_text = "I ♡ Cyper Security"
@@ -200,20 +222,3 @@ if __name__ == "__main__":
         print(f"IV                :\t0x{IV.upper()}\n")
     print(f"Cipher Text       :\t{cipher_text}\n")
     print(f"Decrypted         :\t{decrypted_text}")
-
-    # AES_S_BOX = np.array(AES_S_BOX)
-    # np.savetxt('aes_s_box.txt', AES_S_BOX, fmt='%s')
-    # x = np.genfromtxt('aes_s_box.txt', dtype='str')
-    # print(x)
-    # for i in range(16):
-    #     i = bin(i)[2:]
-    #     print("[", end='')
-    #     for j in range(16):
-    #         j = bin(j)[2:]
-    #         x = aes_s_box(int(i+j, 2))
-    #         print(f"'{x[2:].zfill(2)}'", end=',' if j != "1111" else "")
-    #     print("],")
-
-    # num = "56"
-    # print(b2h(s_box(h2b(num, 8)), 2))
-    # print(aes_s_box(int(num, 16))[2:])

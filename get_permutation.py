@@ -1,6 +1,8 @@
 from numpy import array, savetxt
-from random import shuffle, choice 
+from random import shuffle, choice, seed
 from main import BLOCK_SIZE, KEY_SIZE, b2h
+
+seed(11062024)
 
 KEY = [choice(('0', '1')) for _ in range(KEY_SIZE)]
 KEY = b2h(''.join(KEY), KEY_SIZE//4)
